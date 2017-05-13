@@ -1,5 +1,6 @@
 package org.orangepalantir;
 
+import javafx.geometry.Rectangle2D;
 import sun.awt.image.BytePackedRaster;
 
 import javax.swing.ImageIcon;
@@ -22,6 +23,7 @@ import java.io.InputStream;
 import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -91,11 +93,101 @@ public class NumberIdentification {
 
             }
         }
+
+        class BackPropagationResult{
+            List<double[]> deltaNablaB;
+            List<double[][]> deltaNablaW;
+            public BackPropagationResult(List<double[]> deltaNablaB, List<double[][]> deltaNablaW){
+                this.deltaNablaB = deltaNablaB;
+                this.deltaNablaW = deltaNablaW;
+            }
+        }
+
         public void updateMiniBatch(List<List<double[]>> miniBatch, double trainingRate){
+            List<double[]> nablaB = getBiasZeros();
+
+            List<double[][]> nablaW = getWeightZeros();
+
+            for(List<double[]> batch: miniBatch){
+                double[] x = batch.get(0);
+                double[] y = batch.get(1);
+                BackPropagationResult result = backPropagate(x, y);
+                for(int i = 0; i<bias.size(); i++){
+                    double[] nb = nablaB.get(i);
+                    double[] dnb = result.deltaNablaB.get(i);
+                    for(int j = 0; j<nb.length; j++){
+                        nb[j] += dnb[j];
+                    }
+                }
+                for(int i = 0; i<weights.size(); i++){
+                    double[][] nw = nablaW.get(i);
+                    double[][] dnw = result.deltaNablaW.get(i);
+                    for(int j = 0; j<nw.length; j++){
+                        double[] nwr = nw[j];
+                        double[] dnwr = dnw[j];
+                        for(int k = 0; k<nwr.length; k++){
+                            nwr[k] += dnwr[k];
+                        }
+                    }
+                }
+            }
+            double factor = trainingRate/miniBatch.size();
+            for(int i = 0; i<weights.size(); i++){
+                double[][] weight = weights.get(i);
+                double[][] nW = nablaW.get(i);
+
+                double[] b = bias.get(i);
+                double[] nb = nablaB.get(i);
+
+
+                for(int j = 0; j< nW.length; j++){
+                    double[] wr = weight[j];
+                    double[] nwr = nW[j];
+                    for(int k = 0; k<wr.length; k++){
+                        wr[k] = wr[k] - factor*nwr[k];
+                    }
+
+                    b[j] = b[j] - factor*nb[j];
+                }
+            }
+        }
+
+        public BackPropagationResult backPropagate(double[] x, double[] y){
+            List<double[]> nablaB = getBiasZeros();
+            List<double[][]> nablaW = getWeightZeros();
             
+
+            return new BackPropagationResult(new ArrayList<>(), new ArrayList<>());
+        }
+
+        List<double[]> getBiasZeros(){
+            List<double[]> x = new ArrayList<>();
+            int n = bias.get(0).length;
+            for(int i = 0; i<bias.size(); i++){
+                x.add(new double[n]);
+            }
+            return x;
+        }
+
+        List<double[][]> getWeightZeros(){
+            List<double[][]> zeros = new ArrayList<>();
+            int wl = weights.get(0).length;
+            int ww = weights.get(0)[0].length;
+            for(int i = 0; i<weights.size(); i++){
+                zeros.add(new double[wl][ww]);
+            }
+
+            return zeros;
         }
     }
 
+    /**
+     * Calculates the output of sigmoid neurons for
+     * @param w
+     * @param a
+     * @param b
+     * @return
+     */
     public static double[] sigmoid(double[][] w, double[] a, double[] b){
         double[] aprime = new double[b.length];
         for(int i = 0; i<b.length; i++){
@@ -106,6 +198,23 @@ public class NumberIdentification {
             }
             aprime[i] += b[i];
             aprime[i] = 1.0/(1.0 + Math.exp(-aprime[i]));
+        }
+        return aprime;
+    }
+
+
+
+    public static double[] sigmoidDerivative(double[][] w, double[] a, double[] b){
+        double[] aprime = new double[b.length];
+        for(int i = 0; i<b.length; i++){
+
+            double[] weights = w[i];
+            for(int j = 0; j<a.length; j++){
+                aprime[i] += weights[j]*a[j];
+            }
+            aprime[i] += b[i];
+            double z = Math.exp(-aprime[i]);
+            aprime[i] = -z/((1.0 + z)*(1.0+z));
         }
         return aprime;
     }
@@ -202,13 +311,11 @@ public class NumberIdentification {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         AtomicInteger counter = new AtomicInteger(0);
         button.addActionListener(evt->{
-            int c = counter.accumulateAndGet(1, (i,x)->{
-                return (i+x)%images.size();
-            });
+            int c = counter.accumulateAndGet(1, (i,x)-> (i+x)%images.size());
 
             button.setIcon(new ImageIcon(images.get(c)));
             label.setText(labels.get(c));
-            frame.repaint();
+            //frame.repaint();
         });
     }
 
