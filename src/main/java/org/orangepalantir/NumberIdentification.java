@@ -1,29 +1,21 @@
 package org.orangepalantir;
 
-import javafx.geometry.Rectangle2D;
-import sun.awt.image.BytePackedRaster;
-
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import java.awt.BorderLayout;
-import java.awt.EventQueue;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
-import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,189 +27,11 @@ import java.util.zip.GZIPInputStream;
  * Created by msmith on 11.05.17.
  */
 public class NumberIdentification {
-    Random ng = new Random(1l);
 
-    class Network{
-        int[] sizes;
-        List<double[]> bias = new ArrayList<>();
-        List<double[][]> weights = new ArrayList<>();
-        public Network(int[] sizes){
-            for(int i = 1; i<sizes.length; i++){
-                double[] b = new double[sizes[i]];
-                for(int j = 0; j<b.length; j++){
-                    b[j] = ng.nextGaussian();
-                }
-                bias.add(b);
-            }
-            for(int i = 1; i<sizes.length; i++){
-                int x = sizes[i-1];
-                int y = sizes[i];
-                double[][] w = new double[y][x];
-                for(int j = 0; j<x; j++){
-                    for(int k = 0; k<y; k++){
-                        w[j][k] = ng.nextGaussian();
-                    }
-                }
-            }
+    public NumberIdentification(){
 
-        }
-
-        /**
-         * Takes inputs a (N) calculates the final response and returns the output.
-         *
-         * @param a
-         * @return
-         */
-        public double[] feedForward(double[] a){
-            for(int i= 0; i<bias.size();i++){
-                a = sigmoid(weights.get(i), a, bias.get(i));
-            }
-            return a;
-        }
-
-        public void StochasticGradientDescent(List<List<double[]>> trainingData, int epochs, int batchSize, double eta){
-            for(int i = 0;i<epochs; i++){
-                Collections.shuffle(trainingData);
-
-                List<List<List<double[]>>> miniBatches = new ArrayList<>();
-                int batchCount = trainingData.size()/batchSize;
-
-                for(int k = 0; k<batchCount; k++){
-                    miniBatches.add(trainingData.subList(k*batchSize, (k+1)*batchSize));
-                }
-
-                for(List<List<double[]>> miniBatch: miniBatches){
-                    updateMiniBatch(miniBatch, eta);
-                }
-
-
-            }
-        }
-
-        class BackPropagationResult{
-            List<double[]> deltaNablaB;
-            List<double[][]> deltaNablaW;
-            public BackPropagationResult(List<double[]> deltaNablaB, List<double[][]> deltaNablaW){
-                this.deltaNablaB = deltaNablaB;
-                this.deltaNablaW = deltaNablaW;
-            }
-        }
-
-        public void updateMiniBatch(List<List<double[]>> miniBatch, double trainingRate){
-            List<double[]> nablaB = getBiasZeros();
-
-            List<double[][]> nablaW = getWeightZeros();
-
-            for(List<double[]> batch: miniBatch){
-                double[] x = batch.get(0);
-                double[] y = batch.get(1);
-                BackPropagationResult result = backPropagate(x, y);
-                for(int i = 0; i<bias.size(); i++){
-                    double[] nb = nablaB.get(i);
-                    double[] dnb = result.deltaNablaB.get(i);
-                    for(int j = 0; j<nb.length; j++){
-                        nb[j] += dnb[j];
-                    }
-                }
-                for(int i = 0; i<weights.size(); i++){
-                    double[][] nw = nablaW.get(i);
-                    double[][] dnw = result.deltaNablaW.get(i);
-                    for(int j = 0; j<nw.length; j++){
-                        double[] nwr = nw[j];
-                        double[] dnwr = dnw[j];
-                        for(int k = 0; k<nwr.length; k++){
-                            nwr[k] += dnwr[k];
-                        }
-                    }
-                }
-            }
-            double factor = trainingRate/miniBatch.size();
-            for(int i = 0; i<weights.size(); i++){
-                double[][] weight = weights.get(i);
-                double[][] nW = nablaW.get(i);
-
-                double[] b = bias.get(i);
-                double[] nb = nablaB.get(i);
-
-
-                for(int j = 0; j< nW.length; j++){
-                    double[] wr = weight[j];
-                    double[] nwr = nW[j];
-                    for(int k = 0; k<wr.length; k++){
-                        wr[k] = wr[k] - factor*nwr[k];
-                    }
-
-                    b[j] = b[j] - factor*nb[j];
-                }
-            }
-        }
-
-        public BackPropagationResult backPropagate(double[] x, double[] y){
-            List<double[]> nablaB = getBiasZeros();
-            List<double[][]> nablaW = getWeightZeros();
-            
-
-            return new BackPropagationResult(new ArrayList<>(), new ArrayList<>());
-        }
-
-        List<double[]> getBiasZeros(){
-            List<double[]> x = new ArrayList<>();
-            int n = bias.get(0).length;
-            for(int i = 0; i<bias.size(); i++){
-                x.add(new double[n]);
-            }
-            return x;
-        }
-
-        List<double[][]> getWeightZeros(){
-            List<double[][]> zeros = new ArrayList<>();
-            int wl = weights.get(0).length;
-            int ww = weights.get(0)[0].length;
-            for(int i = 0; i<weights.size(); i++){
-                zeros.add(new double[wl][ww]);
-            }
-
-            return zeros;
-        }
     }
 
-    /**
-     * Calculates the output of sigmoid neurons for
-     * @param w
-     * @param a
-     * @param b
-     * @return
-     */
-    public static double[] sigmoid(double[][] w, double[] a, double[] b){
-        double[] aprime = new double[b.length];
-        for(int i = 0; i<b.length; i++){
-
-            double[] weights = w[i];
-            for(int j = 0; j<a.length; j++){
-                aprime[i] += weights[j]*a[j];
-            }
-            aprime[i] += b[i];
-            aprime[i] = 1.0/(1.0 + Math.exp(-aprime[i]));
-        }
-        return aprime;
-    }
-
-
-
-    public static double[] sigmoidDerivative(double[][] w, double[] a, double[] b){
-        double[] aprime = new double[b.length];
-        for(int i = 0; i<b.length; i++){
-
-            double[] weights = w[i];
-            for(int j = 0; j<a.length; j++){
-                aprime[i] += weights[j]*a[j];
-            }
-            aprime[i] += b[i];
-            double z = Math.exp(-aprime[i]);
-            aprime[i] = -z/((1.0 + z)*(1.0+z));
-        }
-        return aprime;
-    }
 
     final static int TRAIN_IMAGES_MAGIC=2051;
     final static int TRAIN_LABEL_MAGIC=2049;
@@ -233,69 +47,83 @@ public class NumberIdentification {
                 DataInputStream trainLabels = new DataInputStream(
                         new GZIPInputStream(new FileInputStream(new File("training/train-labels-idx1-ubyte.gz")))
                 );
-                InputStream testImages = new GZIPInputStream(new FileInputStream(new File("training/train-images-idx3-ubyte.gz")));
-                InputStream testLabels = new GZIPInputStream(new FileInputStream(new File("training/train-images-idx3-ubyte.gz")))
+                DataInputStream testImages = new DataInputStream(
+                        new GZIPInputStream(new FileInputStream(new File("training/t10k-images-idx3-ubyte.gz")))
+                );
+                DataInputStream testLabels = new DataInputStream(
+                        new GZIPInputStream(new FileInputStream(new File("training/t10k-labels-idx1-ubyte.gz")))
+                )
 
                 ){
-            //readBytes(trainImages, buffer, 0, 8);
-            //int magic = getInt(buffer, 0);
-            int magic = trainImages.readInt();
 
-            if(magic!=TRAIN_IMAGES_MAGIC){
-                throw new MagicNumberException("Magic number not correct for training image file.");
-            }
+            //load test data.
 
-            int items = trainImages.readInt();
+            List<List<double[]>> trainingData = loadDataSet(trainImages, trainLabels);
+            List<List<double[]>> testData = loadDataSet(testImages, testLabels);
 
-
-
-            magic = trainLabels.readInt();
-            if(magic!=TRAIN_LABEL_MAGIC){
-                throw new MagicNumberException("Magic number not correct for training label file.");
-            }
-            if(items!=trainLabels.readInt()){
-                throw new MagicNumberException("Number of images does not equal the number of labels");
-            }
-
-            List<BufferedImage> images = new ArrayList<>();
-            List<String> labels = new ArrayList<>();
-
-
-            int rows = trainImages.readInt();
-            int columns = trainImages.readInt();;
-            int n = rows*columns;
-
-            byte[] lDat = new byte[items];
-            trainLabels.readFully(lDat, 0, items);
-
-
-
-            byte[] buffer = new byte[n];
-            for(int i = 0; i<items; i++){
-
-                trainImages.readFully(buffer);
-
-                labels.add(String.format("%d", lDat[i]));
-
-                BufferedImage img = new BufferedImage(columns, rows, BufferedImage.TYPE_BYTE_GRAY);
-                Raster r = Raster.createRaster(
-                        img.getSampleModel(),
-                        new DataBufferByte(buffer, rows*columns),
-                        new Point(0,0)
-                );
-                img.setData(r);
-                images.add(img);
-            }
-
-            showImages(images, labels);
+            Network network = new Network(new int[]{784, 30, 10});
+            network.stochasticGradientDescent(trainingData, 30, 10, 0.01, testData);
 
         } catch (IOException e) {
             e.printStackTrace();
         } catch (MagicNumberException e){
-
+            e.printStackTrace();
         }
 
 
+    }
+
+    static List<List<double[]>> loadDataSet(DataInputStream trainImages, DataInputStream trainLabels) throws IOException, MagicNumberException {
+        //readBytes(trainImages, buffer, 0, 8);
+        //int magic = getInt(buffer, 0);
+        int magic = trainImages.readInt();
+        if(magic!=TRAIN_IMAGES_MAGIC){
+            throw new MagicNumberException("Magic number not correct for training image file.");
+        }
+        int items = trainImages.readInt();
+
+        magic = trainLabels.readInt();
+        if(magic!=TRAIN_LABEL_MAGIC){
+            throw new MagicNumberException("Magic number not correct for training label file.");
+        }
+        if(items!=trainLabels.readInt()){
+            throw new MagicNumberException("Number of images does not equal the number of labels");
+        }
+
+
+
+        int rows = trainImages.readInt();
+        int columns = trainImages.readInt();;
+        int n = rows*columns;
+
+        byte[] lDat = new byte[items];
+        trainLabels.readFully(lDat, 0, items);
+
+
+        byte[] buffer = new byte[n];
+        List<List<double[]>> trainingData = new ArrayList<>();
+        for(int i = 0; i<items; i++){
+
+            trainImages.readFully(buffer);
+            List<double[]> row = new ArrayList<>();
+            row.add(convertToInput(buffer));
+            double[] v = new double[10];
+            v[lDat[i]] = 1;
+            row.add(v);
+            trainingData.add(row);
+        }
+        return trainingData;
+    }
+
+    static BufferedImage createImage(byte[] buffer, int columns, int rows){
+        BufferedImage img = new BufferedImage(columns, rows, BufferedImage.TYPE_BYTE_GRAY);
+        Raster r = Raster.createRaster(
+                img.getSampleModel(),
+                new DataBufferByte(buffer, rows*columns),
+                new Point(0,0)
+        );
+        img.setData(r);
+        return img;
     }
 
     static void showImages(List<BufferedImage> images, List<String> labels){
@@ -319,6 +147,14 @@ public class NumberIdentification {
         });
     }
 
+    static double[] convertToInput(byte[] bytes){
+        double[] ret = new double[bytes.length];
+        for(int i = 0; i<bytes.length; i++){
+            ret[i] = 1.0*(bytes[i]&0xff);
+        }
+        return ret;
+
+    }
 
 
 
