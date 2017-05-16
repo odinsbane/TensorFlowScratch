@@ -6,11 +6,20 @@ import java.util.List;
 import java.util.Random;
 
 public class Network{
-    int[] sizes;
-    Random ng = new Random(1l);
 
+    //state of the network.
+    int[] sizes;
+    Random ng = new Random();
     List<double[]> bias = new ArrayList<>();
     List<double[][]> weights = new ArrayList<>();
+
+    int success = 0;
+    /**
+     * Creates a new network with sizes.length layers. One is the input layer and the other is the output layer and
+     * the rest are hidden.
+     *
+     * @param sizes an array with the number of nodes per layer.
+     */
     public Network(int[] sizes){
 
         //initialize the bias to random values.
@@ -34,6 +43,7 @@ public class Network{
             }
             weights.add(w);
         }
+
         this.sizes = sizes;
 
     }
@@ -75,9 +85,10 @@ public class Network{
             }
             if(testData!=null){
                 int n = testData.size();
-                int pass= evaluate(testData);
-                System.out.println("Epoch: " + i + " " + pass + "/" + n);
+                success = evaluate(testData);
+                System.out.println("Epoch: " + i + " " + success + "/" + n);
             }
+
         }
     }
 
@@ -180,6 +191,7 @@ public class Network{
 
         List<double[]> zs= new ArrayList<>();
         List<double[]> activations = new ArrayList<>();
+
         activations.add(x);
 
         int layers = sizes.length;
@@ -193,26 +205,28 @@ public class Network{
             double[] z = argument(w, activation, b);
             zs.add(z);
 
-            activation = sigmoid(w, activation, b);
+            activation = sigmoid(z);
             activations.add(activation);
 
         }
 
+
         //calculates the difference between the last activation, and the actual values.
-        double[] deltas = costDerivative(activation, y);
+        double[] delta = costDerivative(activation, y);
 
         double[] derivatives = sigmoidDerivative(zs.get(zs.size()-1));
 
         double[] nB = nablaB.get(nablaB.size()-1);
 
-        for(int i = 0; i<deltas.length; i++){
-            nB[i] = derivatives[i]*deltas[i];
+        for(int i = 0; i<delta.length; i++){
+            nB[i] = derivatives[i]*delta[i];
         }
-        deltas = nB;
+        delta = nB;
 
         double[] act = activations.get(activations.size()-2);
         double[][] nW = nablaW.get(nablaW.size()-1);
 
+        //deltas (dot) activations(Transpose)
         for(int i = 0; i<nW.length; i++){
             double[] nw = nW[i];
             for(int j = 0; j<nw.length; j++){
@@ -228,22 +242,25 @@ public class Network{
             double[][] weight = weights.get(weights.size()-i + 1);
             double[] del = nablaB.get(nablaB.size() - i);
 
-            //transpose and dot.
+            // weight(Transpose) (dot) delta
             for(int j = 0; j<weight.length; j++){
                 double[] row = weight[j];
                 for(int k = 0; k<row.length; k++){
-                    del[k] += row[k]*deltas[j]*sp[j];
+                    del[k] += row[k]*delta[j];
                 }
             }
-
-            deltas = del;
+            for(int j = 0; j<del.length; j++){
+                del[j] = del[j]*sp[j];
+            }
+            delta = del;
 
             double[][] nw = nablaW.get(nablaW.size() - i);
             act = activations.get(activations.size() - i - 1);
+            //delta (dot) activations(Transpose)
             for(int j = 0; j<nw.length; j++){
                 double[] row = nw[j];
                 for(int k = 0; k<row.length; k++){
-                    row[k] =  deltas[j]*act[k];
+                    row[k] =  delta[j]*act[k];
                 }
             }
         }
@@ -330,6 +347,18 @@ public class Network{
         return aprime;
     }
 
+    /**
+     * Calculates the output of sigmoid neurons for
+     * @return
+     */
+    public static double[] sigmoid(double[] z){
+        double[] aprime = new double[z.length];
+        for(int i = 0; i<z.length; i++){
+            aprime[i] = 1.0/(1.0 + Math.exp(-z[i]));
+        }
+        return aprime;
+    }
+
     public static double[] sigmoidDerivative(double[] zs){
         double[] aprime = new double[zs.length];
         for(int i = 0; i<zs.length; i++){
@@ -360,29 +389,35 @@ public class Network{
     }
 
     public static void main(String[] args) {
-        Network n = new Network(new int[]{10, 5, 3});
-
-        double[] xn = new double[10];
-
+        Network n = new Network(new int[]{4, 3, 2});
+        List<List<double[]>> training = new ArrayList<>();
         for(int i = 0; i<10; i++){
-            xn[i] = 0.1*i;
+
+            double[] xn = new double[4];
+            double[] yn = new double[2];
+            for(int j = 0; j<4; j++){
+                xn[j] = (i+j)%4;
+            }
+
+            for(int k = 0; k<2; k++){
+                yn[k] = (i+k)%2;
+            }
+
+            training.add(Arrays.asList(xn, yn));
+
         }
 
-        double[] yn = new double[3];
-        yn[1] = 1;
-
-        BackPropagationResult bpr = n.backPropagate(xn, yn);
-
-        for(double[] row: bpr.deltaNablaB){
-            System.out.println(Arrays.toString(row));
+        n.stochasticGradientDescent(training, 100, 5, 1, null);
+        for (double[] bia : n.bias) {
+            System.out.println(Arrays.toString(bia));
         }
-
-        for(double[][] batch: bpr.deltaNablaW){
-            System.out.println("\n");
-            for(double[] row: batch){
+        System.out.println("**************                     ****************");
+        System.out.println("**************                     ****************");
+        for(double[][] w: n.weights){
+            for(double[] row: w){
                 System.out.println(Arrays.toString(row));
             }
+            System.out.println("**********");
         }
-
     }
 }

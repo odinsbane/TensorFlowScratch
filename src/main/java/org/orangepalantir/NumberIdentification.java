@@ -1,10 +1,14 @@
 package org.orangepalantir;
 
+import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import java.awt.BorderLayout;
+import java.awt.EventQueue;
+import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
@@ -13,9 +17,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,16 +29,57 @@ import java.util.zip.GZIPInputStream;
  * Created by msmith on 11.05.17.
  */
 public class NumberIdentification {
+    List<List<double[]>> trainingData;
+    List<List<double[]>> testData;
+    Network network;
+    int epochs = 1;
+    int hiddenLayer = 25;
+    int batchSize = 10;
+    double eta = 3;
 
-    public NumberIdentification(){
+    BufferedImage testImg;
+    String testLabel;
+    int testIndex;
+    Random ng = new Random();
+    public NumberIdentification(List<List<double[]>> trainingData, List<List<double[]>> testData){
+        this.trainingData = trainingData;
+        this.testData = testData;
 
     }
 
+    public void start(){
+        chooseRandomTestImage();
+        EventQueue.invokeLater(()->{
+            buildGui();
+        });
+    }
+
+    public void chooseRandomTestImage(){
+
+        testIndex = ng.nextInt(testData.size());
+        List<double[]> test = testData.get(testIndex);
+        testImg = createImage(test.get(0), 28, 28);
+        testLabel = getLabel(test.get(1));
+    }
+
+    private String getLabel(double[] binary) {
+        for(int i = 0; i<binary.length; i++){
+            if(binary[i]>0){
+                return i +"";
+            }
+        }
+        return -1 + "";
+    }
+
+    public void initialize(){
+        network = new Network(new int[]{784, hiddenLayer, 10});
+    }
+    public void trainNetwork(){
+        network.stochasticGradientDescent(trainingData, epochs, batchSize, eta, testData);
+    }
 
     final static int TRAIN_IMAGES_MAGIC=2051;
     final static int TRAIN_LABEL_MAGIC=2049;
-    final static int TEST_IMAGES_MAGIC=2051;
-    final static int TEST_LABEL_MAGIC=2049;
 
 
     public static void main(String[] args){
@@ -61,8 +104,8 @@ public class NumberIdentification {
             List<List<double[]>> trainingData = loadDataSet(trainImages, trainLabels);
             List<List<double[]>> testData = loadDataSet(testImages, testLabels);
 
-            Network network = new Network(new int[]{784, 30, 10});
-            network.stochasticGradientDescent(trainingData, 30, 10, 0.01, testData);
+            NumberIdentification numb = new NumberIdentification(trainingData, testData);
+            numb.start();
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -89,11 +132,8 @@ public class NumberIdentification {
         if(items!=trainLabels.readInt()){
             throw new MagicNumberException("Number of images does not equal the number of labels");
         }
-
-
-
         int rows = trainImages.readInt();
-        int columns = trainImages.readInt();;
+        int columns = trainImages.readInt();
         int n = rows*columns;
 
         byte[] lDat = new byte[items];
@@ -115,7 +155,11 @@ public class NumberIdentification {
         return trainingData;
     }
 
-    static BufferedImage createImage(byte[] buffer, int columns, int rows){
+    static BufferedImage createImage(double[] value, int columns, int rows){
+        byte[] buffer = new byte[value.length];
+        for(int i = 0; i<value.length; i++){
+            buffer[i] = (byte)(255*value[i]);
+        }
         BufferedImage img = new BufferedImage(columns, rows, BufferedImage.TYPE_BYTE_GRAY);
         Raster r = Raster.createRaster(
                 img.getSampleModel(),
@@ -126,35 +170,93 @@ public class NumberIdentification {
         return img;
     }
 
-    static void showImages(List<BufferedImage> images, List<String> labels){
+    void buildGui(){
         JFrame frame = new JFrame();
-        ImageIcon icon = new ImageIcon(images.get(0));
-        JButton button = new JButton();
-        button.setIcon(icon);
-        JLabel label = new JLabel(labels.get(0));
-        frame.add(button, BorderLayout.CENTER);
-        frame.add(label, BorderLayout.NORTH);
+        JPanel content = new JPanel();
+        content.setLayout(new BorderLayout());
+
+        ImageIcon icon = new ImageIcon();
+        icon.setImage(testImg);
+        JLabel testImage = new JLabel(icon);
+
+        content.add(testImage, BorderLayout.CENTER);
+
+        JLabel testJLabel = new JLabel(testLabel);
+        JLabel guessJLabel = new JLabel("-");
+        JPanel column = new JPanel();
+        column.setLayout(new BoxLayout(column, BoxLayout.PAGE_AXIS));
+        column.add(new JLabel("actual"));
+        column.add(testJLabel);
+        column.add(new JLabel("guess"));
+        column.add(guessJLabel);
+        content.add(column, BorderLayout.EAST);
+
+        JPanel row = new JPanel();
+        row.setLayout(new GridLayout(2,4));
+        JButton initialize = new JButton("init");
+        JButton train = new JButton("train");
+        JButton guess = new JButton("guess");
+        JButton next = new JButton("next");
+
+
+
+        row.add(initialize);
+        row.add(train);
+        row.add(guess);
+        row.add(next);
+
+        JLabel successLabel = new JLabel("--");
+        JLabel totalLabel = new JLabel("/" + testData.size());
+        row.add(new JLabel(""));
+        row.add(new JLabel(""));
+        row.add(successLabel);
+        row.add(totalLabel);
+
+        content.add(row, BorderLayout.SOUTH);
+
+        frame.setContentPane(content);
         frame.pack();
         frame.setVisible(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        AtomicInteger counter = new AtomicInteger(0);
-        button.addActionListener(evt->{
-            int c = counter.accumulateAndGet(1, (i,x)-> (i+x)%images.size());
 
-            button.setIcon(new ImageIcon(images.get(c)));
-            label.setText(labels.get(c));
-            //frame.repaint();
+        initialize.addActionListener(evt->initialize());
+        train.addActionListener(evt->{
+            trainNetwork();
+            successLabel.setText(network.success + "");
+        });
+
+        guess.addActionListener(evt->{
+            List<double[]> data = testData.get(testIndex);
+            double[] a = network.feedForward(data.get(0));
+            double max = -Double.MAX_VALUE;
+            int dex = -1;
+            for(int i = 0; i<a.length; i++){
+                if(a[i]>max){
+                    dex = i;
+                    max = a[i];
+                }
+            }
+            guessJLabel.setText("" + dex);
+        });
+
+        next.addActionListener(evt->{
+            chooseRandomTestImage();
+            icon.setImage(testImg);
+            testJLabel.setText("" + testLabel);
+            testImage.repaint();
         });
     }
 
     static double[] convertToInput(byte[] bytes){
         double[] ret = new double[bytes.length];
+        double v = 0;
         for(int i = 0; i<bytes.length; i++){
-            ret[i] = 1.0*(bytes[i]&0xff);
+            ret[i] = 1.0*(bytes[i]&0xff)/255;
+
         }
         return ret;
-
     }
+
 
 
 
