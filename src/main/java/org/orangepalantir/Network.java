@@ -5,6 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * First excercise from http://neuralnetworksanddeeplearning.com/chap1.html
+ */
 public class Network{
 
     //state of the network.
