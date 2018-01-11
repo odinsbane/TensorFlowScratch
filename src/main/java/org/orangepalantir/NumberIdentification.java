@@ -201,17 +201,17 @@ public class NumberIdentification {
         JButton train = new JButton("train");
         JButton guess = new JButton("guess");
         JButton next = new JButton("next");
-
+        JButton snapshot = new JButton("snapshot");
 
 
         row.add(initialize);
         row.add(train);
         row.add(guess);
         row.add(next);
+        row.add(snapshot);
 
         JLabel successLabel = new JLabel("--");
         JLabel totalLabel = new JLabel("/" + testData.size());
-        row.add(new JLabel(""));
         row.add(new JLabel(""));
         row.add(successLabel);
         row.add(totalLabel);
@@ -227,9 +227,10 @@ public class NumberIdentification {
         train.addActionListener(evt->{
             trainNetwork();
             successLabel.setText(network.success + "");
-            createNetworkSnapShot();
 
         });
+
+        snapshot.addActionListener(evt->createNetworkSnapShot());
 
         guess.addActionListener(evt->{
             List<double[]> data = testData.get(testIndex);

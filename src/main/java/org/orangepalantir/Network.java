@@ -95,6 +95,13 @@ public class Network{
         }
     }
 
+    /**
+     * Evaluates all of the test data using feed forward and comparing that to the expected values included in the test
+     * data.
+     *
+     * @param testData A list of N samples, {input vector, output vector pairs}.
+     * @return The total number of samples that the network got correct. a number betwen 0 and N.
+     */
     public int evaluate(List<List<double[]>> testData){
         int sum = 0;
         for(List<double[]> data: testData){
