@@ -31,7 +31,7 @@ public class Hello {
         Operation o2 = g.opBuilder("Const", "node2").setAttr("dtype", node2.dataType()).setAttr("value", node2).build();
         Operation node3 = g.opBuilder("Add", "sum").addInput(o1.output(0)).addInput(o2.output(0)).build();
         System.out.println(node3);
-        List<Tensor> results = s.runner().fetch("sum").run();
+        List<Tensor<?>> results = s.runner().fetch("sum").run();
         System.out.println(results.get(0).floatValue());
 
 
