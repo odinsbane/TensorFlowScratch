@@ -104,13 +104,12 @@ public class TTTLookupTable {
         }
         public int getMove(int state){
             EventQueue.invokeLater(()->updateState(state));
-            int move = 0;
             try {
-                move = queue.take();
+                int move = queue.take();
                 int new_state = state + move;
 
 
-                EventQueue.invokeLater(()->updateState(state));
+                EventQueue.invokeLater(()->updateState(new_state));
 
                 return new_state;
             } catch (InterruptedException e) {
@@ -235,185 +234,225 @@ public class TTTLookupTable {
         }
     }
 
-    class PlaysBest implements Player{
+    class PlaysBest implements Player {
         final int symbol;
-        public PlaysBest(int s){
+
+        public PlaysBest(int s) {
             symbol = s;
         }
+
         @Override
         public int getMove(int state) {
             int[] moves = getMoves(state, symbol);
             double best = -1;
             int dex = -1;
-
-            for(int i = 0; i<9; i++){
-                if(moves[i]>0){
+            int best_count = 0;
+            for (int i = 0; i < 9; i++) {
+                if (moves[i] > 0) {
                     double p = table[moves[i]];
-                    if(p>best){
+                    if (p > best) {
                         best = p;
                         dex = i;
-                    } else if(p==best){
-                        if(ng.nextDouble()>0.5){
-                            best = p;
-                            dex = i;
+                    } else if (p == best) {
+                        best_count++;
+                    }
+                }
+            }
+            if (best_count > 1) {
+                int choice = ng.nextInt(best_count);
+                int t = 0;
+                for (int i = 0; i < 9; i++) {
+                    if(moves[i]>0) {
+
+                        double p = table[moves[i]];
+                        if (p == best) {
+                            if (choice == t) {
+                                dex = i;
+                                break;
+                            } else {
+                                t++;
+                            }
                         }
                     }
                 }
             }
-            if(dex<0){
-                throw new RuntimeException("Couldnt Find best move");
-            }
-            return state + symbol*threes[dex];
-        }
-    }
-
-    int[] score;
-    public void runTable(Path out){
-        if(Files.exists(out)){
-            try {
-                load(out);
-            } catch (IOException e) {
-                e.printStackTrace();
+                if (dex < 0) {
+                    throw new RuntimeException("Couldnt Find best move");
+                }
+                return state + symbol * threes[dex];
             }
         }
-        Player a = new HumanPlayer(1);
-        Player b = new RandomPlayer(2);
-        score = new int[]{0, 0};
-        for(int i = 0; i<100000; i++){
-            playgame(a,b);
-        }
 
+        int[] score;
+
+        public void runTable(Path out) {
+            if (Files.exists(out)) {
+                try {
+                    load(out);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            Player a = new RandomPlayer(1);
+            Player b = new PlaysBest(2);
+            score = new int[]{0, 0};
+            for (int i = 0; i < 100000; i++) {
+                playgame(a, b);
+            }
+        /*
         try {
             save(out);
         } catch (IOException e) {
             e.printStackTrace();
+        }*/
+            System.out.println(Arrays.toString(score));
         }
-        System.out.println(Arrays.toString(score));
+
+        public void playgame(Player a, Player b) {
+
+            int[] moves = new int[9];
+            int state = 0;
+            Player p;
+            int symbol;
+            int winner = -1;
+            int i;
+            for (i = 0; i < 9; i++) {
+                if (i % 2 == 1) {
+                    p = b;
+                    symbol = 2;
+                } else {
+                    p = a;
+                    symbol = 1;
+                }
+                state = p.getMove(state);
+                moves[i] = state;
+                if (i > 3 && won(state, symbol)) {
+                    winner = symbol;
+                    break;
+                }
+            }
+            if (winner > 0) {
+                String[] ss = {"  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "};
+                int last = 0;
+                int counter = 0;
+                for (int m : moves) {
+                    int delta = m - last;
+                    for (int k = 0; k < 9; k++) {
+                        int dex = (delta / threes[k]) % 3;
+                        if (dex > 0) {
+                            ss[k] = (dex == 1 ? "X" : "O") + counter;
+                            break;
+                        }
+                    }
+                    counter++;
+                    last = m;
+                }
+                for (int k = 0; k < 3; k++) {
+                    for (int j = 0; j < 3; j++) {
+                        int dex = 3 * j + k;
+                        System.out.print(ss[dex]);
+                    }
+                    System.out.println("");
+                }
+                System.out.println("......: " + winner);
+                score[winner - 1] += 1;
+            }
+            updateTable(moves, i - 1, winner);
+        }
+
+        public void updateTable(int[] moves, int n, int symbol) {
+            if (symbol > 10) return;
+            if (symbol < 0) {
+                table[moves[n]] = 1;
+                table[moves[n - 1]] = 1;
+            } else {
+                table[moves[n]] = 1;
+                table[moves[n - 1]] = 0;
+            }
+
+            for (int i = n - 2; i >= 0; i--) {
+                table[moves[i]] = table[moves[i]] + alpha * (table[moves[i + 2]] - table[moves[i]]);
+            }
+
+        }
+
+
+        public boolean won(int state, int symbol) {
+
+            if (state % 3 == symbol) {
+                //top left corner.
+                if ((state / threes[1]) % 3 == symbol && state / threes[2] % 3 == symbol) {
+                    //left to right.
+                    return true;
+                }
+                if ((state / threes[3]) % 3 == symbol && state / threes[6] % 3 == symbol) {
+                    //top to bottom
+                    return true;
+                }
+
+                if ((state / threes[4]) % 3 == symbol && state / threes[8] % 3 == symbol) {
+                    //diagonal left top to bottom right
+                    return true;
+                }
+
+
+            }
+
+            if ((state / threes[4]) % 3 == symbol) {
+                //top left corner.
+                if ((state / threes[1]) % 3 == symbol && state / threes[7] % 3 == symbol) {
+                    //top to bottom.
+                    return true;
+                }
+                if ((state / threes[3]) % 3 == symbol && state / threes[5] % 3 == symbol) {
+                    //left to right
+                    return true;
+                }
+
+                if ((state / threes[2]) % 3 == symbol && state / threes[6] % 3 == symbol) {
+                    //diagonal right top to bottom left
+                    return true;
+                }
+
+            }
+            if ((state / threes[8]) % 3 == symbol) {
+                //bottom right
+                if ((state / threes[2]) % 3 == symbol && state / threes[5] % 3 == symbol) {
+                    //top to bottom.
+                    return true;
+                }
+                if ((state / threes[6]) % 3 == symbol && state / threes[7] % 3 == symbol) {
+                    //left to right
+                    return true;
+                }
+
+            }
+
+            return false;
+
+        }
+
+
+        public static void main(String[] args) {
+            TTTLookupTable lu = new TTTLookupTable();
+            lu.runTable(Paths.get("null.dat"));
+        }
+
+        int[] getMoves(int played, int symbol) {
+            int[] moves = new int[9];
+            int c = played;
+            for (int i = 0; i < 9; i++) {
+                int o = c % 3;
+                if (o > 0) {
+                    moves[i] = -1;
+                } else {
+                    moves[i] = played + symbol * threes[i];
+                }
+                c /= 3;
+            }
+            return moves;
+        }
     }
 
-    public void playgame(Player a, Player b){
 
-        int[] moves =new int[9];
-        int state = 0;
-        Player p;
-        int symbol;
-        int winner = -1;
-        int i;
-        for(i = 0; i<9; i++){
-            if(i%2==1){
-                p=b;
-                symbol = 2;
-            } else{
-                p=a;
-                symbol = 1;
-            }
-            state = p.getMove(state);
-            moves[i] = state;
-            if (i>3 && won(state, symbol)) {
-                winner = symbol;
-                break;
-            }
-        }
-        if(winner>0){
-            score[winner -1] += 1;
-        }
-        updateTable(moves, i-1, winner);
-    }
-
-    public void updateTable(int[] moves, int n, int symbol){
-
-        if(symbol<0){
-            table[moves[n]] = 1;
-            table[moves[n-1]] = 1;
-        } else{
-            table[moves[n]] = 1;
-            table[moves[n-1]] = 0;
-        }
-
-        for(int i = n - 2; i>=0; i--){
-            table[moves[i]] = table[moves[i]] + alpha*(table[moves[i+2]] - table[moves[i]]);
-        }
-
-    }
-
-
-
-    public boolean won(int state, int symbol){
-
-        if(state%3==symbol){
-            //top left corner.
-            if((state/threes[1])%3==symbol && state/threes[2]%3==symbol){
-                //left to right.
-                return true;
-            }
-            if((state/threes[3])%3==symbol && state/threes[6]%3==symbol){
-                //top to bottom
-                return true;
-            }
-
-            if((state/threes[4])%3==symbol && state/threes[8]%3==symbol){
-                //diagonal left top to bottom right
-                return true;
-            }
-
-
-        }
-
-        if((state/threes[4])%3==symbol){
-            //top left corner.
-            if((state/threes[1])%3==symbol && state/threes[7]%3==symbol){
-                //top to bottom.
-                return true;
-            }
-            if((state/threes[3])%3==symbol && state/threes[5]%3==symbol){
-                //left to right
-                return true;
-            }
-
-            if((state/threes[2])%3==symbol && state/threes[6]%3==symbol){
-                //diagonal right top to bottom left
-                return true;
-            }
-
-        }
-        if((state/threes[8])%3==symbol){
-            //bottom right
-            if((state/threes[2])%3==symbol && state/threes[5]%3==symbol){
-                //top to bottom.
-                return true;
-            }
-            if((state/threes[6])%3==symbol && state/threes[7]%3==symbol){
-                //left to right
-                return true;
-            }
-
-        }
-
-        return false;
-
-    }
-
-
-    public static void main(String[] args){
-        TTTLookupTable lu = new TTTLookupTable();
-        lu.runTable(Paths.get("null.dat"));
-    }
-
-    int[] getMoves(int played, int symbol){
-        int[] moves = new int[9];
-        int c = played;
-        for(int i = 0; i<9; i++){
-            int o = c%3;
-            if(o>0){
-                moves[i] = -1;
-            } else{
-                moves[i] =played + symbol * threes[i];
-            }
-            c /= 3;
-        }
-        return moves;
-    }
-
-
-}
 
