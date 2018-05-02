@@ -1,39 +1,30 @@
 package org.orangepalantir;
 
-import oracle.jrockit.jfr.JFR;
+import org.orangepalantir.tttplayers.*;
 
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import java.awt.EventQueue;
-import java.awt.GridLayout;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Random;
-import java.util.concurrent.SynchronousQueue;
 
 /**
  * Created by smithm3 on 01/05/18.
  */
 public class TTTLookupTable {
     final int states = 19683;
-    double[] table;
-    final static int[] threes = {
+    public double[] table;
+    public final static int[] threes = {
             1,   3,    9,
             27,  81,   243,
             729, 2187, 6561
     };
-    double alpha = 0.5;
-    Random ng = new Random();
+    double alpha = 0.001;
+    public Random ng = new Random();
 
     static int pow(int base, int exp){
         int result = 1;
@@ -84,206 +75,7 @@ public class TTTLookupTable {
         }
     }
 
-    interface Player{
-        int getMove(int state);
-    }
-
-    class HumanPlayer implements Player{
-        final int symbol;
-        SynchronousQueue<Integer> queue = new SynchronousQueue<>(true);
-        List<JButton> buttons = new ArrayList<>();
-        HumanPlayer(int symbol){
-            this.symbol=symbol;
-            try {
-                EventQueue.invokeAndWait(this::buildGui);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
-            }
-        }
-        public int getMove(int state){
-            EventQueue.invokeLater(()->updateState(state));
-            try {
-                int move = queue.take();
-                int new_state = state + move;
-
-
-                EventQueue.invokeLater(()->updateState(new_state));
-
-                return new_state;
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return state;
-        }
-
-        void buildGui(){
-            JFrame frame = new JFrame("Human");
-            JPanel content = new JPanel();
-            content.setLayout(new GridLayout(3,3));
-            for(int i = 0; i<9; i++){
-                JButton button = new JButton("  ");
-                int factor = threes[i];
-                button.addActionListener(evt->{
-                    if(button.getText().equals("O") || button.getText().equals("X")){
-                        return;
-                    }
-
-                    queue.offer(factor*symbol);
-                });
-                content.add(button);
-                buttons.add(button);
-            }
-            frame.setContentPane(content);
-            frame.pack();
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setVisible(true);
-        }
-
-        public void updateState(int state){
-            for(int i = 0; i<9; i++){
-                int piece = (state/threes[i])%3;
-                String s = "  ";
-                switch(piece){
-                    case 1:
-                        s = "X";
-                        break;
-                    case 2:
-                        s = "O";
-                        break;
-                    default:
-                        s = " ";
-                }
-                buttons.get(i).setText(s);
-            }
-        }
-    }
-
-    class RandomPlayer implements Player{
-        final int symbol;
-
-        public RandomPlayer(int symbol){
-            this.symbol = symbol;
-        }
-
-        @Override
-        public int getMove(int state) {
-            int[] moves = getMoves(state, symbol);
-            int possible = 0;
-            for(int i = 0; i<9; i++){
-                if(moves[i]>0){
-                    possible += 1;
-                }
-            }
-            int c = ng.nextInt(possible);
-            int t = 0;
-            for(int i = 0; i<9; i++){
-                if(moves[i]>0){
-                    if(t==c){
-                        return moves[i];
-                    } else{
-                        t++;
-                    }
-                }
-            }
-            throw new RuntimeException("Error in Random move generation!");
-        }
-    }
-
-    class FuzzyPlayer implements Player{
-        final int symbol;
-
-        public FuzzyPlayer(int symbol){
-            this.symbol = symbol;
-        }
-
-        @Override
-        public int getMove(int state) {
-            int[] moves = getMoves(state, symbol);
-            double possible = 0;
-            int any = 0;
-            for(int i = 0; i<9; i++){
-                if(moves[i]>0){
-                    possible += table[moves[i]];
-                    any++;
-                }
-            }
-
-            if(any==1){
-                for(int i = 0; i<9; i++){
-                    if(moves[i]>0){
-                        return moves[i];
-                    }
-                }
-            } else{
-                double f = possible*ng.nextDouble();
-                possible=0;
-                for(int i = 0; i<9; i++){
-                    if(moves[i]>0){
-                        possible += table[moves[i]];
-                        if(possible>=f){
-                            return moves[i];
-                        }
-                    }
-                }
-            }
-
-            throw new RuntimeException("Error in Fuzzy Move Generation.");
-
-        }
-    }
-
-    class PlaysBest implements Player {
-        final int symbol;
-
-        public PlaysBest(int s) {
-            symbol = s;
-        }
-
-        @Override
-        public int getMove(int state) {
-            int[] moves = getMoves(state, symbol);
-            double best = -1;
-            int dex = -1;
-            int best_count = 0;
-            for (int i = 0; i < 9; i++) {
-                if (moves[i] > 0) {
-                    double p = table[moves[i]];
-                    if (p > best) {
-                        best = p;
-                        dex = i;
-                    } else if (p == best) {
-                        best_count++;
-                    }
-                }
-            }
-            if (best_count > 1) {
-                int choice = ng.nextInt(best_count);
-                int t = 0;
-                for (int i = 0; i < 9; i++) {
-                    if(moves[i]>0) {
-
-                        double p = table[moves[i]];
-                        if (p == best) {
-                            if (choice == t) {
-                                dex = i;
-                                break;
-                            } else {
-                                t++;
-                            }
-                        }
-                    }
-                }
-            }
-                if (dex < 0) {
-                    throw new RuntimeException("Couldnt Find best move");
-                }
-                return state + symbol * threes[dex];
-            }
-        }
-
-        int[] score;
+    int[] score;
 
         public void runTable(Path out) {
             if (Files.exists(out)) {
@@ -293,18 +85,18 @@ public class TTTLookupTable {
                     e.printStackTrace();
                 }
             }
-            Player a = new RandomPlayer(1);
-            Player b = new PlaysBest(2);
+            Player a = new HumanPlayer(1);
+            Player b = new FuzzyPlayer(this, 2);
             score = new int[]{0, 0};
             for (int i = 0; i < 100000; i++) {
                 playgame(a, b);
             }
-        /*
+
         try {
             save(out);
         } catch (IOException e) {
             e.printStackTrace();
-        }*/
+        }
             System.out.println(Arrays.toString(score));
         }
 
@@ -332,49 +124,87 @@ public class TTTLookupTable {
                 }
             }
             if (winner > 0) {
-                String[] ss = {"  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "};
-                int last = 0;
-                int counter = 0;
-                for (int m : moves) {
-                    int delta = m - last;
-                    for (int k = 0; k < 9; k++) {
-                        int dex = (delta / threes[k]) % 3;
-                        if (dex > 0) {
-                            ss[k] = (dex == 1 ? "X" : "O") + counter;
-                            break;
-                        }
-                    }
-                    counter++;
-                    last = m;
-                }
-                for (int k = 0; k < 3; k++) {
-                    for (int j = 0; j < 3; j++) {
-                        int dex = 3 * j + k;
-                        System.out.print(ss[dex]);
-                    }
-                    System.out.println("");
-                }
-                System.out.println("......: " + winner);
                 score[winner - 1] += 1;
             }
-            updateTable(moves, i - 1, winner);
+            updateTable(moves, i);
+            //printTableWinners();
         }
 
-        public void updateTable(int[] moves, int n, int symbol) {
-            if (symbol > 10) return;
-            if (symbol < 0) {
+        public void printMoves(int[] moves, int winner){
+            String[] ss = {"  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "};
+            int last = 0;
+            int counter = 0;
+            for (int m : moves) {
+                int delta = m - last;
+                for (int k = 0; k < 9; k++) {
+                    int dex = (delta / threes[k]) % 3;
+                    if (dex > 0) {
+                        ss[k] = (dex == 1 ? "X" : "O") + counter;
+                        break;
+                    }
+                }
+                counter++;
+                last = m;
+            }
+            for (int k = 0; k < 3; k++) {
+                for (int j = 0; j < 3; j++) {
+                    int dex = 3 * j + k;
+                    System.out.print(ss[dex]);
+                }
+                System.out.println("");
+            }
+            System.out.println("......: " + winner);
+        }
+
+    public void printBoard(int board){
+        String[] ss = {"_", "_", "_", "_", "_", "_", "_", "_", "_"};
+        int last = 0;
+        int counter = 0;
+        for (int k = 0; k < 9; k++) {
+            int dex = (board / threes[k]) % 3;
+            if (dex > 0) {
+                ss[k] = (dex == 1 ? "X" : "O");
+            }
+        }
+
+        for (int k = 0; k < 3; k++) {
+            for (int j = 0; j < 3; j++) {
+                int dex = 3 * j + k;
+                System.out.print(ss[dex]);
+            }
+            System.out.println("");
+        }
+        System.out.println("---");
+    }
+
+
+
+    public void updateTable(int[] moves, int n) {
+            int winner;
+            if(n==9){
+                n = n-1;
+                //the loop finished without a break.
                 table[moves[n]] = 1;
                 table[moves[n - 1]] = 1;
-            } else {
+                winner = -1;
+            }else{
                 table[moves[n]] = 1;
                 table[moves[n - 1]] = 0;
+                winner = (n%2) + 1;
             }
-
+            //printMoves(moves, winner);
             for (int i = n - 2; i >= 0; i--) {
                 table[moves[i]] = table[moves[i]] + alpha * (table[moves[i + 2]] - table[moves[i]]);
             }
 
         }
+    public void printTableWinners(){
+        for(int i = 0; i<table.length; i++){
+            if(table[i]==1.0){
+                printBoard(i);
+            }
+        }
+    }
 
 
         public boolean won(int state, int symbol) {
@@ -438,7 +268,7 @@ public class TTTLookupTable {
             lu.runTable(Paths.get("null.dat"));
         }
 
-        int[] getMoves(int played, int symbol) {
+        public static int[] getMoves(int played, int symbol) {
             int[] moves = new int[9];
             int c = played;
             for (int i = 0; i < 9; i++) {
