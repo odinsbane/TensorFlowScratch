@@ -1,4 +1,11 @@
 package org.orangepalantir;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -7,6 +14,8 @@ import java.util.Random;
 
 /**
  * First excercise from http://neuralnetworksanddeeplearning.com/chap1.html
+ *
+ * Fully connected layers.
  */
 public class Network{
 
@@ -49,6 +58,12 @@ public class Network{
 
         this.sizes = sizes;
 
+    }
+
+    private Network(int[] sizes, List<double[]> bias, List<double[][]> weights){
+        this.sizes = sizes;
+        this.bias = bias;
+        this.weights = weights;
     }
 
     /**
@@ -430,4 +445,82 @@ public class Network{
             System.out.println("**********");
         }
     }
+
+    public void save(Path out) throws IOException {
+        System.out.println("Writing: " + Arrays.toString(sizes));
+        try(DataOutputStream output = new DataOutputStream(
+                new BufferedOutputStream(
+                    Files.newOutputStream(
+                        out,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING
+                    )
+                )
+            )
+        ){
+            output.writeInt(sizes.length);
+
+            for(int i = 0; i<sizes.length; i++){
+                output.writeInt(sizes[i]);
+            }
+
+            for(double[] b: bias){
+                for(int i = 0; i<b.length; i++){
+                    output.writeDouble(b[i]);
+                }
+            }
+            for(double[][] weights: this.weights){
+                for(int j = 0; j<weights[0].length; j++){
+                    for(int k = 0;k<weights.length; k++){
+                        output.writeDouble(weights[k][j]);
+                    }
+                }
+            }
+
+            output.writeInt(-1);
+        }
+    }
+
+    static public Network load(Path in) throws IOException {
+        try(DataInputStream input = new DataInputStream(Files.newInputStream(in))){
+            int layers = input.readInt();
+            int[] sizes = new int[layers];
+            for(int i = 0; i<layers; i++){
+                sizes[i] = input.readInt();
+            }
+            System.out.println("Reading: " + Arrays.toString(sizes));
+
+            List<double[]> bias = new ArrayList<>(layers);
+            for(int j = 1; j<layers; j++){
+                int l = sizes[j];
+                double[] b = new double[l];
+                for(int i = 0; i<l; i++){
+                    b[i] = input.readDouble();
+                }
+                bias.add(b);
+            }
+            List<double[][]> W = new ArrayList<>();
+            for(int i = 1; i<layers; i++){
+                int x = sizes[i-1];
+                int y = sizes[i];
+                double[][] weights = new double[y][x];
+                for(int j = 0; j<x; j++){
+                    for(int k = 0;k<y; k++){
+                        weights[k][j] = input.readDouble();
+                    }
+                }
+                W.add(weights);
+
+            }
+            int test = input.readInt();
+            if(test!=-1){
+                System.err.println("warning last bytes are not -1: " + test);
+            }
+
+            return new Network(sizes, bias, W);
+
+
+        }
+    }
+
 }

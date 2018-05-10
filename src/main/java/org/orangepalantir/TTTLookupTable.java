@@ -86,7 +86,7 @@ public class TTTLookupTable {
                 }
             }
             Player a = new HumanPlayer(1);
-            Player b = new FuzzyPlayer(this, 2);
+            Player b = new NNPlayer(Paths.get("ttt-nn.dat"));
             score = new int[]{0, 0};
             for (int i = 0; i < 100000; i++) {
                 playgame(a, b);
@@ -265,7 +265,7 @@ public class TTTLookupTable {
 
         public static void main(String[] args) {
             TTTLookupTable lu = new TTTLookupTable();
-            lu.runTable(Paths.get("null.dat"));
+            lu.runTable(Paths.get("lookup.dat"));
         }
 
         public static int[] getMoves(int played, int symbol) {
