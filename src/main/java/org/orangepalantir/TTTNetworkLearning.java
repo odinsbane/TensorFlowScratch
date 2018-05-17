@@ -176,7 +176,7 @@ public class TTTNetworkLearning {
      * @param state
      * @return
      */
-    double[] getPossible(double[] state){
+    public double[] getPossible(double[] state){
         double s = 0;
         for(double d: state){
             s+=d;
@@ -261,5 +261,9 @@ public class TTTNetworkLearning {
 
         student.saveNetwork(bp);
 
+    }
+
+    public void trainToWin(List<List<double[]>> training) {
+        brain.stochasticGradientDescent(training, 1000, training.size(), 0.05, null);
     }
 }

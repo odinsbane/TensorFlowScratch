@@ -85,15 +85,18 @@ public class TTTLookupTable {
                     e.printStackTrace();
                 }
             }
-            Player a = new HumanPlayer(1);
-            Player b = new NNPlayer(Paths.get("ttt-nn.dat"));
+            //Player a = new FuzzyPlayer(this, 1);
+            Player a = new PlaysBest(this, 1);
+            Player b = new NNPlayer(Paths.get("to-win.dat"));
             score = new int[]{0, 0};
             for (int i = 0; i < 100000; i++) {
                 playgame(a, b);
             }
 
         try {
-            save(out);
+
+            Path backout = Paths.get(out.toAbsolutePath().getParent().toString(), out.getFileName().toString().replace(".dat", "-2.dat"));
+            save(backout);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -125,6 +128,17 @@ public class TTTLookupTable {
             }
             if (winner > 0) {
                 score[winner - 1] += 1;
+
+                if(winner==1){
+                    a.finished(1);
+                    b.finished(-1);
+                } else{
+                    a.finished(-1);
+                    b.finished(1);
+                }
+            } else{
+                a.finished(0);
+                b.finished(0);
             }
             updateTable(moves, i);
             //printTableWinners();

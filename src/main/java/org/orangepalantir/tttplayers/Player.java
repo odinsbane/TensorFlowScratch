@@ -5,4 +5,7 @@ package org.orangepalantir.tttplayers;
  */
 public interface Player{
     int getMove(int state);
+    default void finished(int result){
+
+    }
 }
